@@ -28,10 +28,10 @@ def simulate(rho, c, lam, Ta, Tn, T0, L, h, total_time, tau):
     beta = np.zeros(Nx + 1)
 
     for n in range(steps_n):
+        # прямой проход
         alpha[0] = 0.0
         beta[0] = float(Ta)
 
-        # прямой проход
         for i in range(1, Nx):
             F_i = -(rho * c / tau) * T[i]
 

@@ -49,8 +49,8 @@ def simulate(rho, c, lam, Ta, Tn, T0, L, h, total_time, tau):
             T_next[i] = alpha[i] * T_next[i + 1] + beta[i]
 
         T = T_next
-    # финальный профиль температур (T) и температура в центре стержня (индекс Nx//2).
-    return T, T[Nx // 2]
+    # температура в центре стержня
+    return T[Nx // 2]
 def get_float(prompt, default):
     """Запрашивает число, при пустом вводе возвращает значение по умолчанию."""
     val = input(f"{prompt} [{default}]: ").strip()
@@ -82,7 +82,7 @@ def table_run():
         row = [f"{dt:<8}"]
         for h in hs:
             try:
-                _, center = simulate(rho, c, lam, Ta, Tn, T0, L, h, total_time, dt)
+                center = simulate(rho, c, lam, Ta, Tn, T0, L, h, total_time, dt)
                 row.append(f"{center:8.2f}")
             except Exception:
                 row.append("     —   ") # если расчёт не удался, н-р слишком мелкий шаг

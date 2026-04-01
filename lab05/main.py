@@ -62,6 +62,8 @@ class YesNoFrame(ttk.Frame):
         ttk.Label(self, text=explanation, justify="left").pack(anchor="w", pady=10)
 
     def generate_answer(self):
+        """ Метод последовательного вычитания"""
+
         question = self.question_entry.get().strip()
         if not question:
             messagebox.showerror("Ошибка", "Введите вопрос.")
@@ -81,8 +83,9 @@ class YesNoFrame(ttk.Frame):
         # answer = "ДА!" if alpha < p else "НЕТ!"
 
         events = [("ДА", p), ("НЕТ", 1 - p)]
-        alpha = random.random()
+        alpha = random.random() # базовый датчик, генерирующий α ∈ [0,1).
 
+        # Тут происходит последовательное вычитание вероятностей
         for name, prob in events:
             alpha -= prob
             if alpha <= 0:
@@ -99,6 +102,7 @@ class MagicBallFrame(ttk.Frame):
 
         ttk.Label(self, text='Приложение "Шар предсказаний" (Magic 8-Ball)', style="Header.TLabel").pack(anchor="w", pady=(0, 15))
 
+        # полная группа из 8 предсказаний с НЕРАВНЫМИ вероятностями, чтобы равны надо 0.125 всем
         self.events = [
             ("Бесспорно", 0.15),
             ("Вероятнее всего", 0.15),
@@ -162,17 +166,13 @@ class MagicBallFrame(ttk.Frame):
         ttk.Label(self, text=explanation, justify="left").pack(anchor="w", pady=10)
 
     def predict(self):
+        """ Метод накопления сумм"""
         question = self.question_entry.get().strip()
         if not question:
             messagebox.showerror("Ошибка", "Введите вопрос.")
             return
 
-        # for event:
-        #     alpha -= p
-        #     if alpha <= 0:
-        #         return event
-
-        alpha = random.random()
+        alpha = random.random() #
         cumulative = 0.0
         chosen_index = len(self.events) - 1
 

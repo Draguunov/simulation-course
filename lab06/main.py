@@ -47,7 +47,6 @@ LIGHT_STYLE = """
     QLabel { color: #1d1d1f; }
 """
 
-
 class StatCard(QFrame):
     def __init__(self, title):
         super().__init__()
@@ -86,28 +85,31 @@ class StatCard(QFrame):
 
 
 def generate_discrete_manual(x, p, n):
+    """генерирует n случайных чисел из дискретного распределения —
+    то есть числа берутся только из заданного набора x с заданными вероятностями p"""
     samples = []
     for _ in range(n):
-        alpha = np.random.random()
+        alpha = np.random.random() # случайное число от 0 до 1
         for xi, pi in zip(x, p):
-            alpha -= pi
-            if alpha <= 0:
+            alpha -= pi             # вычитаем вероятность
+            if alpha <= 0:          # попали в интервал
                 samples.append(xi)
                 break
     return np.array(samples)
 
 
 def box_muller_normal(n, mean=0.0, variance=1.0):
+    "генерирует n случайных чисел, распределённых по нормальному закону (колоколообразная кривая)"
     sigma = math.sqrt(variance)
-    u1 = np.random.rand(n)
+    u1 = np.random.rand(n)      # n равномерных чисел
     u2 = np.random.rand(n)
-    u1 = np.maximum(u1, 1e-12)
+    u1 = np.maximum(u1, 1e-12)   # избегаем нуля
     z = np.sqrt(-2 * np.log(u1)) * np.cos(2 * np.pi * u2)
     return mean + sigma * z
 
 
-def relative_error(empirical, theoretical):
-    if abs(theoretical) < 1e-12:
+def relative_error(empirical, theoretical): # вычисляет относ.ошибк. в %
+    if abs(theoretical) < 1e-12: # если ошибка меньше (почти 0) то
         return abs(empirical) * 100
     return abs(empirical - theoretical) / abs(theoretical) * 100
 
@@ -146,19 +148,19 @@ class ModernLabApp(QMainWindow):
 
         side_panel.addWidget(QLabel("<b>Настройки дискретной СВ</b>"))
 
-        self.n_input = QSpinBox()
+        self.n_input = QSpinBox() # Поле для размера выборки N
         self.n_input.setRange(10, 1000000)
         self.n_input.setValue(1000)
         side_panel.addWidget(QLabel("Размер выборки N:"))
         side_panel.addWidget(self.n_input)
 
-        self.presets = QComboBox()
+        self.presets = QComboBox() # Выпадающий список с пресетами
         self.presets.addItems(["Пустая таблица", "Равномерное", "Бернулли"])
         self.presets.currentIndexChanged.connect(self.load_preset)
         side_panel.addWidget(QLabel("Пресет:"))
         side_panel.addWidget(self.presets)
 
-        self.table = QTableWidget(5, 3)
+        self.table = QTableWidget(5, 3)  # Таблица для ввода значений X и вероятностей
         self.table.setHorizontalHeaderLabels(["X", "P теор.", "P эмп."])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         side_panel.addWidget(self.table)
@@ -204,17 +206,17 @@ class ModernLabApp(QMainWindow):
 
         side_panel.addWidget(QLabel("<b>Настройки нормальной СВ</b>"))
 
-        self.mean_box = QDoubleSpinBox()
+        self.mean_box = QDoubleSpinBox() # Среднее значение (a)
         self.mean_box.setRange(-1000.0, 1000.0)
         self.mean_box.setValue(0.0)
         self.mean_box.setDecimals(3)
 
-        self.var_box = QDoubleSpinBox()
+        self.var_box = QDoubleSpinBox() # Дисперсия (σ²)
         self.var_box.setRange(0.001, 1000.0)
         self.var_box.setValue(1.0)
         self.var_box.setDecimals(3)
 
-        self.n_norm = QSpinBox()
+        self.n_norm = QSpinBox() # Размер выборки N
         self.n_norm.setRange(10, 1000000)
         self.n_norm.setValue(1000)
 
@@ -273,7 +275,7 @@ class ModernLabApp(QMainWindow):
             self.table.setItem(row, 0, QTableWidgetItem(str(x)))
             self.table.setItem(row, 1, QTableWidgetItem(str(p)))
 
-    def read_discrete_data(self):
+    def read_discrete_data(self): # для нормировки нужен
         rows = self.table.rowCount()
         x = []
         p = []
@@ -319,39 +321,39 @@ class ModernLabApp(QMainWindow):
 
         return x, p
 
-    def calculate_discrete(self):
+    def calculate_discrete(self): # Если пользователь выбрал дискрет.окно и кнопку [сгенир. для выбран. N]
         try:
-            n = self.n_input.value()
-            x, p = self.read_discrete_data()
+            n = self.n_input.value()         # берём N
+            x, p = self.read_discrete_data() # читаем таблицу (значения и вероятности)
 
-            samples = generate_discrete_manual(x, p, n)
+            samples = generate_discrete_manual(x, p, n) # генерир.список длины n
 
             unique, counts = np.unique(samples, return_counts=True)
             obs_map = dict(zip(unique, counts))
 
-            m_th = np.sum(x * p)
+            m_th = np.sum(x * p)                        # считаем статистики
             d_th = np.sum((x ** 2) * p) - m_th ** 2
             m_emp = np.mean(samples)
             d_emp = np.var(samples)
 
-            err_m = relative_error(m_emp, m_th)
+            err_m = relative_error(m_emp, m_th)         # считаем ошибку
             err_d = relative_error(d_emp, d_th)
-
-            observed = np.array([obs_map.get(xi, 0) for xi in x], dtype=float)
+                                                                                # считаем хи^2 
+            observed = np.array([obs_map.get(xi, 0) for xi in x], dtype=float)  # сколько раз встретилось
             expected = n * p
             chi_stat = np.sum((observed - expected) ** 2 / expected)
-            chi_crit = chi2.ppf(0.95, len(x) - 1)
-            is_pass = chi_stat < chi_crit
+            chi_crit = chi2.ppf(0.95, len(x) - 1)  # критическое значение
+            is_pass = chi_stat < chi_crit          # Если chi_stat мал — распределение похоже на теоретическое(принимаем)
 
             emp_probs = observed / n
             for i in range(len(x)):
                 self.table.setItem(i, 2, QTableWidgetItem(f"{emp_probs[i]:.4f}"))
 
-            self.card_m.update_val(m_emp, error_pct=err_m)
+            self.card_m.update_val(m_emp, error_pct=err_m)   # Каждая карточка (StatCard) показывает число, погрешностьа,а для χ² — значок ✅ или ❌
             self.card_v.update_val(d_emp, error_pct=err_d)
             self.card_chi.update_val(chi_stat, is_pass=is_pass)
 
-            self.ax_d.clear()
+            self.ax_d.clear()                                                  # рисуем графики, обновляем холст
             self.ax_d.bar(x - 0.15, p, width=0.3, label='Теоретические')
             self.ax_d.bar(x + 0.15, emp_probs, width=0.3, label='Эмпирические')
             self.ax_d.set_ylim(0, 1)
@@ -365,7 +367,7 @@ class ModernLabApp(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", str(e))
 
-    def calculate_discrete_series(self):
+    def calculate_discrete_series(self): # Если пользователь выбрал дискрет.окно и кнопку [сгенир. серию]
         try:
             x, p = self.read_discrete_data()
             self.series_table_d.setRowCount(len(self.series_ns))
@@ -401,7 +403,7 @@ class ModernLabApp(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", str(e))
 
-    def calculate_normal(self):
+    def calculate_normal(self): # Если пользователь выбрал норм.окно и кнопку [сгенир. для выбран. N]
         try:
             n = self.n_norm.value()
             mean = self.mean_box.value()
@@ -441,7 +443,7 @@ class ModernLabApp(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", str(e))
 
-    def calculate_normal_series(self):
+    def calculate_normal_series(self): # Если пользователь выбрал норм.окно и кнопку [сгенир. серию]
         try:
             mean = self.mean_box.value()
             variance = self.var_box.value()

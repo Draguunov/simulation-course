@@ -1,7 +1,7 @@
 import sys
 import csv
 import numpy as np
-from scipy.stats import expon
+from scipy.stats import expon # нужен для генерации случайного времени пребывания в состоянии. В непрерывной цепи Маркова время ожидания до следующего перехода имеет экспоненциальное распределение.
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QTableWidget, QTableWidgetItem, QHeaderView,
@@ -10,11 +10,6 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QTimer
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-
-
-STATE_NAMES = ["Ясно", "Облачно", "Пасмурно"]
-STATE_NUMBERS = [1, 2, 3]
-
 
 STYLE = """
 QMainWindow, QWidget {
@@ -59,6 +54,8 @@ QFrame#Card {
 }
 """
 
+STATE_NAMES = ["Ясно", "Облачно", "Пасмурно"]
+STATE_NUMBERS = [1, 2, 3]
 
 class StatCard(QFrame):
     def __init__(self, title):
@@ -106,13 +103,13 @@ def transition_probability_matrix(q):
         exit_rate = -q[i, i]
         for j in range(n):
             if i != j:
-                p[i, j] = q[i, j] / exit_rate
+                p[i, j] = q[i, j] / exit_rate # интенсивность перехода / общая интенсивность выхода
 
     return p
 
 
 def stationary_distribution(q):
-    """Решает систему для стационарных вероятностей: pi * Q = 0, сумма pi = 1."""
+    """Решает СЛУ для стационарных вероятностей: pi * Q = 0, сумма pi = 1."""
     n = q.shape[0]
     a = q.T.copy()
     b = np.zeros(n)
@@ -121,14 +118,14 @@ def stationary_distribution(q):
     b[-1] = 1.0
 
     pi = np.linalg.solve(a, b)
-    pi = np.maximum(pi, 0)
-    pi = pi / np.sum(pi)
+    pi = np.maximum(pi, 0)  # Она убирает возможные маленькие отрицательные значения из-за вычислительной погрешности
+    pi = pi / np.sum(pi)    # и нормирует сумму вероятностей к 1
     return pi
 
 
 def choose_by_probabilities(probabilities):
     """Выбор номера состояния по ряду распределения."""
-    alpha = np.random.random()
+    alpha = np.random.random() # случайное число от 0 до 1.
     cumulative = 0.0
 
     for index, p in enumerate(probabilities):
@@ -136,7 +133,7 @@ def choose_by_probabilities(probabilities):
         if alpha <= cumulative:
             return index
 
-    return len(probabilities) - 1
+    return len(probabilities) - 1  # probabilities = [0.2, 0.5, 0.3], 0.0–0.2 → первое, 0.2–0.7 → второе, 0.7–1.0 → третье, alpha = 0.63, выбирается второе состояние
 
 
 def simulate_ctmc(q, total_time):
@@ -145,14 +142,14 @@ def simulate_ctmc(q, total_time):
     p = transition_probability_matrix(q)
     pi = stationary_distribution(q)
 
-    current_state = choose_by_probabilities(pi)
+    current_state = choose_by_probabilities(pi) # Начальное состояние выбирается случайно по стационарному распределению
     t = 0.0
     durations = np.zeros(n)
     segments = []
 
-    while t < total_time:
+    while t < total_time: # как моделируется один шаг
         exit_rate = -q[current_state, current_state]
-        stay_time = expon.rvs(scale=1 / exit_rate)
+        stay_time = expon.rvs(scale=1 / exit_rate)  # генерируется случайное время пребывания: сколько дней погода будет оставаться в текущем состоянии до следующего перехода
 
         end_t = min(t + stay_time, total_time)
         real_duration = end_t - t
@@ -163,10 +160,10 @@ def simulate_ctmc(q, total_time):
         if t >= total_time:
             break
 
-        current_state = choose_by_probabilities(p[current_state])
+        current_state = choose_by_probabilities(p[current_state]) # выбирается следующее состояние. смотрит на строку матрицы вероятностей и случайно выбирает, куда перейти дальше.
 
-    empirical = durations / total_time
-    return segments, empirical, pi, p, durations
+    empirical = durations / total_time                            # Ясно: 130/365 = 0.356 Облачно: 150/365 = 0.411 Пасмурно: 85/365 = 0.233
+    return segments, empirical, pi, p, durations                  # история смены погоды; эмп вер; теор вер; матрица вер пер; вр пребывания.
 
 
 class WeatherMarkovApp(QMainWindow):
@@ -224,7 +221,7 @@ class WeatherMarkovApp(QMainWindow):
         left_panel.addWidget(QLabel("Скорость анимации, мс на переход:"))
         self.speed_box = QDoubleSpinBox()
         self.speed_box.setRange(10, 2000)
-        self.speed_box.setValue(120)
+        self.speed_box.setValue(500)
         self.speed_box.setDecimals(0)
         left_panel.addWidget(self.speed_box)
 
@@ -236,9 +233,9 @@ class WeatherMarkovApp(QMainWindow):
         self.btn_export.clicked.connect(self.export_csv)
         left_panel.addWidget(self.btn_export)
 
-        self.card_q = StatCard("Матрица Q")
-        self.card_p = StatCard("Матрица вероятностей переходов")
-        self.card_pi = StatCard("Теоретические вероятности")
+        self.card_q = StatCard("Матрица Q (интенсивности переходов)")
+        self.card_p = StatCard("Матрица P (вероятностей переходов)")
+        self.card_pi = StatCard("Теоретические вероятности (доля времени)")
         left_panel.addWidget(self.card_q)
         left_panel.addWidget(self.card_p)
         left_panel.addWidget(self.card_pi)
@@ -273,7 +270,7 @@ class WeatherMarkovApp(QMainWindow):
                 item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
                 if i == j:
-                    item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+                    item.setFlags(Qt.ItemFlag.ItemIsEnabled) # делаются не редактируемыми
                     item.setBackground(Qt.GlobalColor.lightGray)
 
                 self.rate_table.setItem(i, j, item)
